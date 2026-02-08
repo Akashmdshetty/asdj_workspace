@@ -2,8 +2,8 @@ from rest_framework import generics, status, permissions
 from rest_framework.response import Response
 from rest_framework.views import APIView
 from django.shortcuts import get_object_or_404
-from backend.documents.models import Folder, Document, Comment
-from backend.core.models import Tenant, Membership
+from documents.models import Folder, Document, Comment
+from core.models import Tenant, Membership
 from .serializers import (
     FolderSerializer, DocumentSerializer, CommentSerializer,
     CreateFolderSerializer, CreateDocumentSerializer

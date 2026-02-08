@@ -1,6 +1,6 @@
 from rest_framework import serializers
-from backend.documents.models import Folder, Document, Comment
-from backend.core.api.serializers import UserSerializer
+from documents.models import Folder, Document, Comment
+from core.api.serializers import UserSerializer
 
 class CommentSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)

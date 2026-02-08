@@ -1,6 +1,6 @@
 from django.test import TestCase
 from django.contrib.auth import get_user_model
-from backend.core.models import Tenant, Membership
+from core.models import Tenant, Membership
 
 User = get_user_model()
 

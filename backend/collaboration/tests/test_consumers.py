@@ -1,6 +1,6 @@
 from channels.testing import WebsocketCommunicator
 from django.test import TransactionTestCase
-from backend.config.asgi import application
+from config.asgi import application
 import json
 
 class DocumentConsumerTests(TransactionTestCase):
