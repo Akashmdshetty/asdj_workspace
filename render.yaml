@@ -3,7 +3,7 @@ services:
     name: django-saas-app
     env: python
     buildCommand: "./build.sh"
-    startCommand: "gunicorn backend.config.wsgi:application"
+    startCommand: "gunicorn config.wsgi:application"
     envVars:
       - key: PYTHONPATH
         value: ./backend
