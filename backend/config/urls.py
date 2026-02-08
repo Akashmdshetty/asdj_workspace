@@ -3,8 +3,8 @@ from django.urls import path, include
 
 urlpatterns = [
     path('admin/', admin.site.urls),
-    path('api/', include('backend.core.api.urls')),
-    path('api/', include('backend.documents.api.urls')),
+    path('api/', include('core.api.urls')),
+    path('api/', include('documents.api.urls')),
 ]
 
 from django.conf import settings
