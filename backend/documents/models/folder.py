@@ -1,6 +1,6 @@
 from django.db import models
 from django.conf import settings
-from backend.core.models import Tenant
+from core.models import Tenant
 
 class Folder(models.Model):
     name = models.CharField(max_length=255)
