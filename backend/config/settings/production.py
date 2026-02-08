@@ -27,7 +27,7 @@ MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
 # Add frontend build to static files
 STATICFILES_DIRS = [
-    BASE_DIR / "../frontend/dist",
+    BASE_DIR / "frontend/dist",
 ]
 
 # Channel Layer for Production (Redis)
