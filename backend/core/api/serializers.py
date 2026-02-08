@@ -49,7 +49,7 @@ class MembershipSerializer(serializers.ModelSerializer):
     user = UserSerializer(read_only=True)
     
     class Meta:
-        from backend.core.models import Membership
+        from core.models import Membership
         model = Membership
         fields = ('id', 'user', 'role', 'joined_at')
         read_only_fields = ('id', 'user', 'joined_at')
