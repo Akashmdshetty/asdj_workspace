@@ -9,6 +9,7 @@ def main():
     # Add the project root to sys.path so we can import packages from backend/
     base_dir = Path(__file__).resolve().parent.parent
     sys.path.append(str(base_dir))
+    sys.path.append(str(base_dir / 'backend'))
 
     os.environ.setdefault('DJANGO_SETTINGS_MODULE', 'backend.config.settings.local')
     try:
