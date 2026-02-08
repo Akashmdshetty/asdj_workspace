@@ -1,0 +1,1039 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>ASDJ Workspace - Collaborative SaaS Platform</title>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react/18.2.0/umd/react.production.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/react-dom/18.2.0/umd/react-dom.production.min.js"></script>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/babel-standalone/7.23.5/babel.min.js"></script>
+  <style>
+    .custom-scrollbar::-webkit-scrollbar {
+      width: 8px;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-track {
+      bg-slate-800;
+    }
+
+    .custom-scrollbar::-webkit-scrollbar-thumb {
+      background-color: #d74820;
+      border-radius: 4px;
+    }
+  </style>
+</head>
+
+<body class="bg-slate-900 text-white overflow-hidden">
+  <div id="root"></div>
+
+  <script type="text/babel">
+    const { useState, useEffect, useRef } = React;
+    const API_BASE_URL = 'http://127.0.0.1:8000';
+    const API_URL = `${API_BASE_URL}/api`;
+
+    // --- AUTH COMPONENT ---
+    function AuthScreen({ onLogin }) {
+      const [isRegister, setIsRegister] = useState(false);
+      const [formData, setFormData] = useState({ username: '', email: '', password: '' });
+      const [error, setError] = useState('');
+      const [loading, setLoading] = useState(false);
+
+      const handleSubmit = async (e) => {
+        e.preventDefault();
+        setError('');
+        setLoading(true);
+        const endpoint = isRegister ? '/auth/register/' : '/auth/login/';
+        try {
+          const res = await fetch(`${API_URL}${endpoint}`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify(formData)
+          });
+          const data = await res.json();
+          if (res.ok) {
+            localStorage.setItem('token', data.token);
+            onLogin(data.user);
+          } else {
+            setError(data.error || JSON.stringify(data));
+          }
+        } catch (err) {
+          setError('Connection failed');
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="min-h-screen flex items-center justify-center bg-gradient-to-br from-slate-900 via-slate-800 to-black">
+          <div className="w-full max-w-md p-8 bg-slate-800/50 backdrop-blur-xl border border-slate-700 rounded-2xl shadow-2xl">
+            <div className="text-center mb-8">
+              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-purple-600 rounded-xl mx-auto flex items-center justify-center text-3xl font-bold mb-4">AD</div>
+              <h1 className="text-3xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">ASDJ Workspace</h1>
+              <p className="text-slate-400 mt-2">{isRegister ? "Create your account" : "Welcome back"}</p>
+            </div>
+
+            <form onSubmit={handleSubmit} className="space-y-4">
+              <div>
+                <input
+                  type="text"
+                  placeholder="Username"
+                  required
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder-slate-500"
+                  value={formData.username}
+                  onChange={e => setFormData({ ...formData, username: e.target.value })}
+                />
+              </div>
+              {isRegister && (
+                <div>
+                  <input
+                    type="email"
+                    placeholder="Email"
+                    required
+                    className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder-slate-500"
+                    value={formData.email}
+                    onChange={e => setFormData({ ...formData, email: e.target.value })}
+                  />
+                </div>
+              )}
+              <div>
+                <input
+                  type="password"
+                  placeholder="Password"
+                  required
+                  className="w-full px-4 py-3 bg-slate-900/50 border border-slate-700 rounded-lg focus:ring-2 focus:ring-blue-500 outline-none transition-all placeholder-slate-500"
+                  value={formData.password}
+                  onChange={e => setFormData({ ...formData, password: e.target.value })}
+                />
+              </div>
+
+              {error && <div className="text-red-400 text-sm text-center bg-red-900/20 py-2 rounded-lg border border-red-900/50">{error}</div>}
+
+              <button
+                type="submit"
+                disabled={loading}
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 hover:from-blue-500 hover:to-purple-500 rounded-lg font-semibold shadow-lg shadow-blue-900/20 transition-all transform hover:scale-[1.02] disabled:opacity-50"
+              >
+                {loading ? 'Processing...' : (isRegister ? 'Create Account' : 'Sign In')}
+              </button>
+            </form>
+
+            <div className="mt-6 text-center">
+              <button
+                onClick={() => setIsRegister(!isRegister)}
+                className="text-sm text-slate-400 hover:text-white transition-colors"
+              >
+                {isRegister ? 'Already have an account? Sign In' : "Don't have an account? Sign Up"}
+              </button>
+            </div>
+          </div>
+        </div>
+      );
+    }
+
+    // --- MAIN APP ---
+
+    function Dashboard({ user, onLogout }) {
+
+      const [content, setContent] = useState({ folders: [], documents: [], current_folder: null });
+      const [breadcrumbs, setBreadcrumbs] = useState([]);
+      const [newItemName, setNewItemName] = useState('');
+      const [showNewItemModal, setShowNewItemModal] = useState(false);
+      const [newItemType, setNewItemType] = useState('folder'); // 'folder' or 'file'
+      const [uploading, setUploading] = useState(false);
+      const [dragActive, setDragActive] = useState(false);
+      const [selectedDoc, setSelectedDoc] = useState(null);
+      const [docContent, setDocContent] = useState('');
+      const [comments, setComments] = useState([]);
+      const [newComment, setNewComment] = useState('');
+      const [showComments, setShowComments] = useState(true);
+      const [wsStatus, setWsStatus] = useState('disconnected');
+      const [notifications, setNotifications] = useState([]);
+      const [showConnections, setShowConnections] = useState(false);
+      const [pendingRequests, setPendingRequests] = useState([]);
+      const [connectionTarget, setConnectionTarget] = useState('');
+
+      const [workspaces, setWorkspaces] = useState([]);
+      const [currentWorkspace, setCurrentWorkspace] = useState(null);
+      const [showCreateWsModal, setShowCreateWsModal] = useState(false);
+      const [showMembersModal, setShowMembersModal] = useState(false);
+      const [newWsName, setNewWsName] = useState('');
+      const [wsMembers, setWsMembers] = useState([]);
+      const [memberUrl, setMemberUrl] = useState(''); // For adding members
+
+      const socketRef = useRef(null);
+      const textareaRef = useRef(null);
+      const fileInputRef = useRef(null);
+
+      // Fetch Workspaces on Load
+      useEffect(() => {
+        fetchWorkspaces();
+      }, []);
+
+      const fetchWorkspaces = async () => {
+        try {
+          const res = await fetch(`${API_URL}/workspaces/`, {
+            headers: { 'Authorization': `Token ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setWorkspaces(data);
+            if (data.length > 0 && !currentWorkspace) {
+              setCurrentWorkspace(data[0]);
+            }
+          }
+        } catch (e) { }
+      };
+
+      const createWorkspace = async () => {
+        if (!newWsName.trim()) return;
+        try {
+          const res = await fetch(`${API_URL}/workspaces/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ name: newWsName })
+          });
+          if (res.ok) {
+            addNotification('Workspace created!', 'success');
+            setNewWsName('');
+            setShowCreateWsModal(false);
+            fetchWorkspaces();
+          }
+        } catch (e) { addNotification('Failed to create workspace', 'error'); }
+      };
+      // Fetch Content when workspace or current folder changes
+      useEffect(() => {
+        if (currentWorkspace) {
+          fetchContent(currentWorkspace.id, content.current_folder?.id);
+        }
+      }, [currentWorkspace, content.current_folder?.id]);
+
+      const fetchContent = async (workspaceId, folderId = null) => {
+        let url = `${API_URL}/workspaces/${workspaceId}/content/`;
+        if (folderId) url += `?folder_id=${folderId}`;
+
+        try {
+          const res = await fetch(url, {
+            headers: { 'Authorization': `Token ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) {
+            const data = await res.json();
+            setContent(data);
+
+            // Update breadcrumbs logic could be here or manual
+            // For now, let's just rely on current_folder from backend or build it up
+            // A simple way is to push to breadcrumbs when entering, pop when going back
+            // But reliable way is if backend sent full path. 
+            // For this MVP, we will handle breadcrumbs locally on navigation.
+          }
+        } catch (e) { }
+      };
+
+      const handleNavigate = (folder) => {
+        // Entering a folder
+        setBreadcrumbs([...breadcrumbs, content.current_folder].filter(Boolean));
+        // Optimistically update current folder to trigger fetch
+        setContent(prev => ({ ...prev, current_folder: folder }));
+      };
+
+      const handleNavigateUp = (index) => {
+        // Navigate to specific breadcrumb
+        if (index === -1) {
+          // Root
+          setContent(prev => ({ ...prev, current_folder: null }));
+          setBreadcrumbs([]);
+        } else {
+          const target = breadcrumbs[index];
+          setContent(prev => ({ ...prev, current_folder: target }));
+          setBreadcrumbs(breadcrumbs.slice(0, index));
+        }
+      };
+
+      const handleDrag = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        if (e.type === 'dragenter' || e.type === 'dragover') {
+          setDragActive(true);
+        } else if (e.type === 'dragleave') {
+          setDragActive(false);
+        }
+      };
+
+      const handleDrop = async (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        setDragActive(false);
+
+        if (e.dataTransfer.files && e.dataTransfer.files[0]) {
+          await handleFileUpload(e.dataTransfer.files[0]);
+        }
+      };
+
+
+      const handleFileSelect = (e) => {
+        if (e.target.files && e.target.files[0]) {
+          handleFileUpload(e.target.files[0]);
+        }
+      };
+
+      const handleFileUpload = async (file) => {
+        if (!currentWorkspace) return;
+        setUploading(true);
+
+        const formData = new FormData();
+        formData.append('type', 'file');
+        formData.append('title', file.name);
+        formData.append('file', file);
+        if (content.current_folder) {
+          formData.append('parent_id', content.current_folder.id);
+        }
+
+        try {
+          const token = localStorage.getItem('token');
+          const res = await fetch(`${API_URL}/workspaces/${currentWorkspace.id}/content/`, {
+            method: 'POST',
+            headers: {
+              'Authorization': `Token ${token}`
+            },
+            body: formData
+          });
+
+          if (res.ok) {
+            fetchContent(currentWorkspace.id, content.current_folder?.id);
+            addNotification('File uploaded successfully', 'success');
+          } else {
+            addNotification('Upload failed', 'error');
+          }
+        } catch (err) {
+          console.error(err);
+          addNotification('Upload error', 'error');
+        } finally {
+          setUploading(false);
+        }
+      };
+
+      const handleDelete = async (e, item, type) => {
+        e.stopPropagation();
+        if (!confirm(`Are you sure you want to delete "${type === 'folder' ? item.name : item.title}"?`)) return;
+
+        try {
+          const token = localStorage.getItem('token');
+          const endpoint = type === 'folder' ? `folders/${item.id}` : `documents/${item.id}`;
+          const res = await fetch(`${API_URL}/${endpoint}/`, {
+            method: 'DELETE',
+            headers: {
+              'Authorization': `Token ${token}`
+            }
+          });
+
+          if (res.ok) {
+            if (selectedDoc && selectedDoc.id === item.id) {
+              setSelectedDoc(null);
+              setDocContent('');
+            }
+            fetchContent(currentWorkspace.id, content.current_folder?.id);
+            addNotification('Item deleted', 'success');
+          } else {
+            addNotification('Failed to delete item', 'error');
+          }
+        } catch (err) {
+          console.error('Delete failed', err);
+          addNotification('Delete error', 'error');
+        }
+      };
+
+      const createItem = async () => {
+        if (!newItemName.trim() || !currentWorkspace) return;
+        try {
+          const res = await fetch(`${API_URL}/workspaces/${currentWorkspace.id}/content/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({
+              type: newItemType,
+              name: newItemType === 'folder' ? newItemName : undefined,
+              title: newItemType === 'file' ? newItemName : undefined,
+              parent_id: content.current_folder?.id
+            })
+          });
+          if (res.ok) {
+            addNotification(`${newItemType} created!`, 'success');
+            setNewItemName('');
+            setShowNewItemModal(false);
+            fetchContent(currentWorkspace.id, content.current_folder?.id);
+          } else {
+            addNotification('Failed to create item', 'error');
+          }
+        } catch (e) { addNotification('Network error', 'error'); }
+      };
+
+      const fetchMembers = async () => {
+        if (!currentWorkspace) return;
+        try {
+          const res = await fetch(`${API_URL}/workspaces/${currentWorkspace.id}/members/`, {
+            headers: { 'Authorization': `Token ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) setWsMembers(await res.json());
+        } catch (e) { }
+      };
+
+      const addMember = async (uniqueId) => {
+        if (!currentWorkspace) return;
+        try {
+          const res = await fetch(`${API_URL}/workspaces/${currentWorkspace.id}/members/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ unique_id: uniqueId })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            addNotification('Member added successfully', 'success');
+            fetchMembers();
+          } else {
+            addNotification(data.error || 'Failed to add member', 'error');
+          }
+        } catch (e) { addNotification('Network error', 'error'); }
+      };
+
+      useEffect(() => {
+        if (showMembersModal && currentWorkspace) {
+          fetchMembers();
+        }
+      }, [showMembersModal, currentWorkspace]);
+
+      // Fetch Pending Requests
+      useEffect(() => {
+        fetchPendingRequests();
+        const interval = setInterval(fetchPendingRequests, 10000);
+        return () => clearInterval(interval);
+      }, []);
+
+      const fetchPendingRequests = async () => {
+        try {
+          const res = await fetch(`${API_URL}/connections/pending/`, {
+            headers: { 'Authorization': `Token ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) setPendingRequests(await res.json());
+        } catch (e) { }
+      };
+
+      const sendConnectionRequest = async () => {
+        const target = connectionTarget.trim();
+        if (!target || target.length !== 6) {
+          addNotification('ID must be exactly 6 characters', 'error');
+          return;
+        }
+        try {
+          const res = await fetch(`${API_URL}/connections/send/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ unique_id: target })
+          });
+          const data = await res.json();
+          if (res.ok) {
+            addNotification('Request sent successfully!', 'success');
+            setConnectionTarget('');
+          } else {
+            addNotification(data.error || 'Failed to send request', 'error');
+          }
+        } catch (e) { addNotification('Network error', 'error'); }
+      };
+
+      const respondRequest = async (id, action) => {
+        try {
+          const res = await fetch(`${API_URL}/connections/${id}/respond/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ action })
+          });
+          if (res.ok) {
+            addNotification(`Request ${action}ed`, 'success');
+            fetchPendingRequests();
+          }
+        } catch (e) { }
+      };
+
+      const addNotification = (message, type = 'info') => {
+        const newNotif = { id: Date.now(), message, type };
+        setNotifications(prev => [newNotif, ...prev].slice(0, 5));
+        setTimeout(() => setNotifications(prev => prev.filter(n => n.id !== newNotif.id)), 5000);
+      };
+
+      // WebSocket Logic
+      useEffect(() => {
+        if (!selectedDoc) return;
+
+        const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
+        const ws = new WebSocket(`${wsScheme}://127.0.0.1:8000/ws/doc/${selectedDoc.id}/`);
+
+        ws.onopen = () => {
+          setWsStatus('connected');
+          addNotification('Connected to document', 'success');
+        };
+
+        ws.onclose = () => {
+          setWsStatus('disconnected');
+          addNotification('Disconnected from document', 'error');
+        };
+
+        ws.onmessage = (e) => {
+          const data = JSON.parse(e.data);
+          if (data.content !== undefined) {
+            // Simple sync: Update if content is different
+            // In a real app, we'd check cursor position to avoid jumping
+            const textarea = textareaRef.current;
+            if (textarea && textarea.value !== data.content) {
+              // Preserve cursor if possible (basic attempt)
+              const start = textarea.selectionStart;
+              const end = textarea.selectionEnd;
+              setDocContent(data.content);
+              // Setting value via React state sometimes jumps cursor. 
+              // This basic layout focuses on simple sync.
+            }
+          }
+        };
+
+        socketRef.current = ws;
+        return () => ws.close();
+      }, [selectedDoc]);
+
+      const handleContentChange = (e) => {
+        const content = e.target.value;
+        setDocContent(content);
+        if (socketRef.current && socketRef.current.readyState === WebSocket.OPEN) {
+          socketRef.current.send(JSON.stringify({ content }));
+        }
+      };
+
+      const handleDocumentOpen = (doc) => {
+        if (selectedDoc?.id === doc.id) return;
+        setDocContent('Loading...');
+        setSelectedDoc(doc);
+        fetchComments(doc.id);
+      };
+
+      const fetchComments = async (docId) => {
+        try {
+          const res = await fetch(`${API_URL}/documents/${docId}/comments/`, {
+            headers: { 'Authorization': `Token ${localStorage.getItem('token')}` }
+          });
+          if (res.ok) setComments(await res.json());
+        } catch (e) { }
+      };
+
+      const postComment = async () => {
+        if (!newComment.trim() || !selectedDoc) return;
+        try {
+          const res = await fetch(`${API_URL}/documents/${selectedDoc.id}/comments/`, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': `Token ${localStorage.getItem('token')}`
+            },
+            body: JSON.stringify({ text: newComment })
+          });
+          if (res.ok) {
+            setNewComment('');
+            fetchComments(selectedDoc.id);
+          }
+        } catch (e) { }
+      };
+
+      return (
+        <div className="min-h-screen bg-gradient-to-br from-slate-900 via-slate-800 to-slate-900 text-white font-sans">
+          {/* NAV */}
+          <nav className="bg-slate-800/80 backdrop-blur-lg border-b border-slate-700/50 sticky top-0 z-50 h-[73px]">
+            <div className="px-6 h-full flex items-center justify-between">
+              <div className="flex items-center space-x-6">
+                <div className="flex items-center space-x-6">
+                  <div className="flex items-center space-x-3">
+                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-xl font-bold">AD</div>
+                    <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">ASDJ</span>
+                  </div>
+
+                  {/* WORKSPACE SELECTOR */}
+                  <div className="relative group">
+                    <button className="px-4 py-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg flex items-center space-x-2 transition-all">
+                      <span className="font-medium">{currentWorkspace ? currentWorkspace.name : 'Select Workspace'}</span>
+                      <span className="text-xs">▼</span>
+                    </button>
+                    <div className="absolute top-full left-0 mt-2 w-56 bg-slate-800 border border-slate-700 rounded-lg shadow-xl opacity-0 invisible group-hover:opacity-100 group-hover:visible transition-all z-50">
+                      {workspaces.map(ws => (
+                        <button
+                          key={ws.id}
+                          onClick={() => setCurrentWorkspace(ws)}
+                          className={`w-full text-left px-4 py-2 hover:bg-slate-700 first:rounded-t-lg ${currentWorkspace?.id === ws.id ? 'text-blue-400' : ''}`}
+                        >
+                          {ws.name}
+                        </button>
+                      ))}
+                      <div className="border-t border-slate-700 p-2">
+                        <button
+                          onClick={() => setShowCreateWsModal(true)}
+                          className="w-full text-center py-1.5 text-xs bg-blue-600/20 text-blue-400 hover:bg-blue-600/30 rounded"
+                        >
+                          + Create New Workspace
+                        </button>
+                      </div>
+                    </div>
+                  </div>
+
+                  {currentWorkspace && (
+                    <button
+                      onClick={() => setShowMembersModal(true)}
+                      className="text-xs text-slate-400 hover:text-white px-3 py-1 bg-slate-800 rounded border border-slate-700"
+                    >
+                      Manage Members
+                    </button>
+                  )}
+                </div>
+                <div className="flex items-center space-x-4">
+                  <button onClick={() => setShowConnections(!showConnections)} className="relative p-2 hover:bg-slate-700 rounded-lg transition-colors">
+                    <span className="text-xl">connection🤝</span>
+                    {pendingRequests.length > 0 && <div className="absolute top-0 right-0 w-3 h-3 bg-red-500 rounded-full"></div>}
+                  </button>
+                  <div className="bg-slate-700/50 px-4 py-2 rounded-lg flex items-center space-x-3">
+                    <div className="text-right">
+                      <div className="font-medium text-sm">{user.username}</div>
+                      <div className="text-xs text-blue-400 font-mono">ID: {user.unique_id}</div>
+                    </div>
+                    <button onClick={onLogout} className="text-xs text-slate-400 hover:text-white">Logout</button>
+                  </div>
+
+                  {/* CREATE WORKSPACE MODAL */}
+                  {showCreateWsModal && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                      <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 w-96 shadow-2xl">
+                        <h3 className="text-lg font-bold mb-4">Create New Workspace</h3>
+                        <input
+                          value={newWsName}
+                          onChange={e => setNewWsName(e.target.value)}
+                          placeholder="Workspace Name (e.g. Project Alpha)"
+                          className="w-full bg-slate-900 border border-slate-600 rounded p-2 mb-4 focus:ring-2 focus:ring-blue-500 outline-none"
+                        />
+                        <div className="flex justify-end space-x-2">
+                          <button onClick={() => setShowCreateWsModal(false)} className="px-4 py-2 text-slate-400 hover:text-white">Cancel</button>
+                          <button onClick={createWorkspace} className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500 font-medium">Create</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* CREATE NEW ITEM MODAL (Folder/File) */}
+                  {showNewItemModal && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                      <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 w-96 shadow-2xl">
+                        <h3 className="text-lg font-bold mb-4">Create New {newItemType === 'folder' ? 'Folder' : 'File'}</h3>
+                        <input
+                          value={newItemName}
+                          onChange={e => setNewItemName(e.target.value)}
+                          placeholder={newItemType === 'folder' ? "Folder Name" : "File Name"}
+                          className="w-full bg-slate-900 border border-slate-600 rounded p-2 mb-4 focus:ring-2 focus:ring-blue-500 outline-none"
+                          autoFocus
+                        />
+                        <div className="flex justify-end space-x-2">
+                          <button onClick={() => setShowNewItemModal(false)} className="px-4 py-2 text-slate-400 hover:text-white">Cancel</button>
+                          <button onClick={createItem} className="px-4 py-2 bg-blue-600 rounded hover:bg-blue-500 font-medium">Create</button>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+
+                  {/* MANAGE MEMBERS MODAL */}
+                  {showMembersModal && (
+                    <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50">
+                      <div className="bg-slate-800 p-6 rounded-xl border border-slate-700 w-[500px] shadow-2xl">
+                        <div className="flex justify-between items-center mb-6">
+                          <h3 className="text-lg font-bold">Manage Members: {currentWorkspace?.name}</h3>
+                          <button onClick={() => setShowMembersModal(false)} className="text-slate-400 hover:text-white">✕</button>
+                        </div>
+
+                        <div className="mb-6">
+                          <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Add Member from Connections</h4>
+                          <div className="flex space-x-2">
+                            <input
+                              value={connectionTarget}
+                              onChange={e => setConnectionTarget(e.target.value)}
+                              placeholder="Enter 6-digit ID of connection"
+                              className="flex-1 bg-slate-900 border border-slate-600 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none"
+                              maxLength="6"
+                            />
+                            <button onClick={() => { addMember(connectionTarget); setConnectionTarget(''); }} className="bg-green-600 px-4 rounded text-sm hover:bg-green-500">Add</button>
+                          </div>
+                          <p className="text-xs text-slate-500 mt-1">User must be in your accepted connections list.</p>
+                        </div>
+
+                        <div>
+                          <h4 className="text-xs font-bold text-slate-400 uppercase mb-2">Current Members ({wsMembers.length})</h4>
+                          <div className="max-h-64 overflow-y-auto custom-scrollbar space-y-1">
+                            {wsMembers.map(m => (
+                              <div key={m.id} className="flex justify-between items-center bg-slate-700/50 p-2 rounded border border-slate-600/30">
+                                <div className="flex items-center space-x-2">
+                                  <div className="w-6 h-6 bg-gradient-to-br from-indigo-500 to-pink-500 rounded-full flex items-center justify-center text-[10px] font-bold">
+                                    {m.user.username[0].toUpperCase()}
+                                  </div>
+                                  <span>{m.user.username} <span className="text-slate-500 text-xs">#{m.user.unique_id}</span></span>
+                                </div>
+                                <span className={`text-xs px-2 py-0.5 rounded ${m.role === 'admin' ? 'bg-purple-500/20 text-purple-300' : 'bg-slate-600/50 text-slate-300'}`}>
+                                  {m.role}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          </nav>
+
+          {/* NOTIFICATIONS */}
+          <div className="fixed top-24 right-6 Z-50 space-y-2 w-80 pointer-events-none">
+            {notifications.map(notif => (
+              <div key={notif.id} className={`px-4 py-3 rounded-lg shadow-lg backdrop-blur-lg border animate-slideIn transition-all ${notif.type === 'success' ? 'bg-green-500/20 border-green-500/50' :
+                notif.type === 'error' ? 'bg-red-500/20 border-red-500/50' : 'bg-slate-700/80'
+                }`}>
+                {notif.message}
+              </div>
+            ))}
+          </div>
+
+          <div className="flex h-[calc(100vh-73px)]">
+            {/* SIDEBAR */}
+            <div className="w-72 bg-slate-800/50 backdrop-blur-sm border-r border-slate-700/50 p-6 flex flex-col">
+              <h2 className="text-sm font-semibold text-slate-400 mb-4 uppercase">Connections</h2>
+              {showConnections ? (
+                <div className="mb-6 space-y-4">
+                  {/* SEND REQUEST BLOCK */}
+                  <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
+                    <h3 className="text-xs font-bold text-blue-400 mb-2 uppercase tracking-wider">Add Connection</h3>
+                    <div className="flex space-x-2">
+                      <input
+                        value={connectionTarget}
+                        onChange={e => setConnectionTarget(e.target.value)}
+                        maxLength="6"
+                        placeholder="6-digit ID"
+                        className="w-full bg-slate-900 border border-slate-600 rounded px-2 py-1 text-sm font-mono focus:ring-1 focus:ring-blue-500 outline-none"
+                      />
+                      <button onClick={sendConnectionRequest} className="bg-blue-600 px-3 rounded text-sm hover:bg-blue-500 font-medium">Send</button>
+                    </div>
+                  </div>
+
+                  {/* INBOX BLOCK */}
+                  <div className="bg-slate-800 p-3 rounded-lg border border-slate-700">
+                    <div className="flex justify-between items-center mb-2">
+                      <h3 className="text-xs font-bold text-green-400 uppercase tracking-wider">Inbox</h3>
+                      <span className="text-xs bg-slate-700 px-1.5 rounded-full text-slate-300">{pendingRequests.length}</span>
+                    </div>
+
+                    {pendingRequests.length > 0 ? (
+                      <div className="space-y-2">
+                        {pendingRequests.map(req => (
+                          <div key={req.id} className="text-xs bg-slate-700/50 p-2 rounded border border-slate-600/50">
+                            <div className="flex justify-between items-center mb-2">
+                              <span className="font-bold text-slate-200">{req.sender.username}</span>
+                              <span className="text-[10px] text-slate-500 font-mono">#{req.sender.unique_id}</span>
+                            </div>
+                            <div className="flex space-x-2">
+                              <button onClick={() => respondRequest(req.id, 'accept')} className="flex-1 bg-green-600/20 text-green-400 hover:bg-green-600/30 py-1 rounded transition-colors">Accept</button>
+                              <button onClick={() => respondRequest(req.id, 'reject')} className="flex-1 bg-red-600/20 text-red-400 hover:bg-red-600/30 py-1 rounded transition-colors">Reject</button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    ) : (
+                      <div className="text-center py-4 text-xs text-slate-500">
+                        <div className="mb-1">📭</div>
+                        No pending requests
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : null}
+
+              {/* MAIN CONTENT AREA */}
+              {/* MAIN CONTENT AREA */}
+              <div className="flex-1 flex flex-col min-h-0 border-r border-slate-700/50 bg-slate-800/30 -mx-6 -mb-6 mt-4">
+                <div className="p-4 border-b border-slate-700/50 flex justify-between items-center bg-slate-800/50">
+                  <h3 className="font-bold text-slate-300">Files</h3>
+                  <div className="flex space-x-1">
+                    <input
+                      type="file"
+                      ref={fileInputRef}
+                      className="hidden"
+                      onChange={handleFileSelect}
+                    />
+                    <button
+                      onClick={() => fileInputRef.current?.click()}
+                      className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-blue-400 transition-colors"
+                      title="Upload File"
+                    >
+                      +📤
+                    </button>
+                    <button
+                      onClick={() => { setNewItemType('folder'); setShowNewItemModal(true); }}
+                      className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
+                      title="New Folder"
+                    >
+                      +📁
+                    </button>
+                    <button
+                      onClick={() => { setNewItemType('file'); setShowNewItemModal(true); }}
+                      className="p-1.5 hover:bg-slate-700 rounded text-slate-400 hover:text-white transition-colors"
+                      title="New File"
+                    >
+                      +📄
+                    </button>
+                  </div>
+                </div>
+
+                {/* BREADCRUMBS */}
+                <div className="flex items-center space-x-1 text-xs text-slate-400 mb-2 overflow-x-auto whitespace-nowrap pb-2 custom-scrollbar">
+                  <button onClick={() => handleNavigateUp(-1)} className="hover:text-white px-1 rounded hover:bg-slate-700">Home</button>
+                  {breadcrumbs.map((crumb, i) => (
+                    <React.Fragment key={crumb.id}>
+                      <span>/</span>
+                      <button onClick={() => handleNavigateUp(i)} className="hover:text-white px-1 rounded hover:bg-slate-700">{crumb.name}</button>
+                    </React.Fragment>
+                  ))}
+                  {content.current_folder && (
+                    <>
+                      <span>/</span>
+                      <span className="text-white px-1">{content.current_folder.name}</span>
+                    </>
+                  )}
+                </div>
+
+                {/* FILE LIST */}
+                <div
+                  className={`space-y-1 flex-1 overflow-y-auto custom-scrollbar relative min-h-0 ${dragActive ? 'bg-blue-500/10 border-2 border-dashed border-blue-500 rounded-lg' : ''}`}
+                  onDragEnter={handleDrag}
+                  onDragLeave={handleDrag}
+                  onDragOver={handleDrag}
+                  onDrop={handleDrop}
+                >
+                  {uploading && (
+                    <div className="absolute inset-0 bg-slate-900/50 flex items-center justify-center z-10">
+                      <div className="text-blue-400 font-bold animate-pulse">Uploading...</div>
+                    </div>
+                  )}
+                  {/* FOLDERS */}
+                  {content.folders.map(folder => (
+                    <button
+                      key={folder.id}
+                      onDoubleClick={() => handleNavigate(folder)}
+                      className="w-full text-left px-3 py-2 rounded-lg transition-all hover:bg-slate-700/50 flex items-center space-x-3 group"
+                    >
+                      <div className="text-lg">📁</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate text-slate-200 group-hover:text-blue-200">{folder.name}</div>
+                      </div>
+                      <button
+                        onClick={(e) => handleDelete(e, folder, 'folder')}
+                        className="p-1 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Delete Folder"
+                      >
+                        🗑️
+                      </button>
+                    </button>
+                  ))}
+
+                  {/* FILES */}
+                  {content.documents.map(doc => (
+                    <button
+                      key={doc.id}
+                      onClick={() => handleDocumentOpen(doc)}
+                      className={`w-full text-left px-3 py-2 rounded-lg transition-all hover:bg-slate-700/50 flex items-center space-x-3 group ${selectedDoc?.id === doc.id ? 'bg-slate-700/70 ring-1 ring-blue-500/50' : ''
+                        }`}
+                    >
+                      <div className="text-lg">📄</div>
+                      <div className="flex-1 min-w-0">
+                        <div className="font-medium text-sm truncate">{doc.title}</div>
+                        <div className="text-[10px] text-slate-500">
+                          {new Date(doc.updated_at).toLocaleDateString()}
+                        </div>
+                      </div>
+                      <button
+                        onClick={(e) => handleDelete(e, doc, 'file')}
+                        className="p-1 text-slate-500 hover:text-red-400 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="Delete File"
+                      >
+                        🗑️
+                      </button>
+                    </button>
+                  ))}
+
+                  {content.folders.length === 0 && content.documents.length === 0 && (
+                    <div className="text-center py-8 text-slate-600 text-xs italic">
+                      Empty folder
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+
+            {/* EDITOR */}
+            <div className="flex-1 bg-slate-900 relative">
+              {selectedDoc ? (
+                <div className="h-full flex flex-col">
+                  <div className="px-8 py-4 bg-slate-800/30 border-b border-slate-700/50 flex justify-between items-center">
+                    <h1 className="text-xl font-bold flex items-center space-x-2">
+                      <span>{selectedDoc.title}</span>
+                      {wsStatus === 'connected' && <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse" title="Connected"></div>}
+                      {wsStatus === 'disconnected' && <div className="w-2 h-2 bg-red-500 rounded-full" title="Disconnected"></div>}
+                    </h1>
+                    <span className="text-xs text-slate-500 font-mono">{selectedDoc.id}</span>
+                  </div>
+
+                  <div className="flex-1 flex overflow-hidden">
+                    {/* EDITOR AREA */}
+                    <div className="flex-1 p-8 flex flex-col overflow-hidden">
+                      {selectedDoc.file ? (
+                        <div className="flex-1 flex flex-col items-center justify-center bg-slate-800/50 rounded-lg border border-slate-700/50 p-4">
+                          {selectedDoc.file.match(/\.(jpeg|jpg|gif|png|webp)$/i) ? (
+                            <img
+                              src={selectedDoc.file.startsWith('http') ? selectedDoc.file : `${API_BASE_URL}${selectedDoc.file}`}
+                              alt={selectedDoc.title}
+                              className="max-w-full max-h-full object-contain shadow-lg rounded"
+                            />
+                          ) : selectedDoc.file.match(/\.pdf$/i) ? (
+                            <iframe
+                              src={selectedDoc.file.startsWith('http') ? selectedDoc.file : `${API_BASE_URL}${selectedDoc.file}`}
+                              className="w-full h-full rounded border-none"
+                              title={selectedDoc.title}
+                            ></iframe>
+                          ) : (
+                            <div className="text-center">
+                              <div className="text-6xl mb-4">📄</div>
+                              <p className="text-slate-300 mb-4">{selectedDoc.title}</p>
+                              <a
+                                href={selectedDoc.file.startsWith('http') ? selectedDoc.file : `${API_BASE_URL}${selectedDoc.file}`}
+                                download
+                                className="px-6 py-2 bg-blue-600 hover:bg-blue-500 rounded-lg font-medium transition-colors inline-flex items-center space-x-2"
+                              >
+                                <span>Download File</span>
+                                <span>⬇️</span>
+                              </a>
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <textarea
+                          ref={textareaRef}
+                          value={docContent}
+                          onChange={handleContentChange}
+                          className="w-full h-full bg-slate-800/50 border border-slate-700/50 rounded-lg p-6 text-slate-200 focus:outline-none focus:ring-2 focus:ring-blue-500/20 resize-none font-mono leading-relaxed"
+                          placeholder="Start typing..."
+                        />
+                      )}
+                    </div>
+
+                    {/* COMMENTS SIDEBAR */}
+                    {showComments && (
+                      <div className="w-72 bg-slate-800/30 border-l border-slate-700/50 flex flex-col">
+                        <div className="p-4 border-b border-slate-700/50 font-bold text-sm text-slate-400 uppercase">Comments</div>
+                        <div className="flex-1 overflow-y-auto p-4 space-y-4 custom-scrollbar">
+                          {comments.map(c => (
+                            <div key={c.id} className="bg-slate-700/50 p-3 rounded text-sm space-y-1">
+                              <div className="flex justify-between items-center text-xs text-slate-400">
+                                <span className="font-bold text-blue-400">{c.user.username}</span>
+                                <span>{new Date(c.created_at).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}</span>
+                              </div>
+                              <p className="text-slate-200 leading-relaxed">{c.text}</p>
+                            </div>
+                          ))}
+                          {comments.length === 0 && <div className="text-center text-xs text-slate-500 italic py-4">No comments yet</div>}
+                        </div>
+                        <div className="p-4 border-t border-slate-700/50">
+                          <textarea
+                            value={newComment}
+                            onChange={e => setNewComment(e.target.value)}
+                            placeholder="Add a comment..."
+                            className="w-full bg-slate-900 border border-slate-600 rounded p-2 text-sm focus:ring-1 focus:ring-blue-500 outline-none resize-none h-20 mb-2"
+                            onKeyDown={e => { if (e.key === 'Enter' && !e.shiftKey) { e.preventDefault(); postComment(); } }}
+                          />
+                          <button onClick={postComment} className="w-full bg-blue-600 hover:bg-blue-500 py-1.5 rounded text-sm font-medium transition-colors">Post</button>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              ) : (
+                <div className="h-full flex items-center justify-center text-slate-500">
+                  <div className="text-center">
+                    <div className="text-6xl mb-4">📂</div>
+                    <p>Select a document to start editing</p>
+                  </div>
+                </div>
+              )}
+            </div>
+
+
+          </div>
+        </div >
+      );
+    }
+
+    function Root() {
+      const [user, setUser] = useState(null);
+
+      useEffect(() => {
+        const token = localStorage.getItem('token');
+        if (token) {
+          fetch(`${API_URL}/auth/me/`, {
+            headers: { 'Authorization': `Token ${token}` }
+          })
+            .then(res => res.ok ? res.json() : Promise.reject())
+            .then(setUser)
+            .catch(() => localStorage.removeItem('token'));
+        }
+      }, []);
+
+      const handleLogout = () => {
+        localStorage.removeItem('token');
+        setUser(null);
+      };
+
+      return user ? <Dashboard user={user} onLogout={handleLogout} /> : <AuthScreen onLogin={setUser} />;
+    }
+
+    ReactDOM.render(<Root />, document.getElementById('root'));
+  </script>
+
+  <style>
+    @keyframes slideIn {
+      from {
+        transform: translateX(100%);
+        opacity: 0;
+      }
+
+      to {
+        transform: translateX(0);
+        opacity: 1;
+      }
+    }
+
+    .animate-slideIn {
+      animation: slideIn 0.3s ease-out;
+    }
+  </style>
+</body>
+
+</html>
