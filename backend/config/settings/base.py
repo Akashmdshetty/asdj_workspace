@@ -36,12 +36,13 @@ THIRD_PARTY_APPS = [
 ]
 
 LOCAL_APPS = [
-    'core',
-    'documents',
-    'collaboration',
-    'audit',
-    'billing',
+    'core.apps.CoreConfig',
+    'documents.apps.DocumentsConfig',
+    'collaboration.apps.CollaborationConfig',
+    'audit.apps.AuditConfig',
+    'billing.apps.BillingConfig',
 ]
+
 
 INSTALLED_APPS = DJANGO_APPS + THIRD_PARTY_APPS + LOCAL_APPS
 
