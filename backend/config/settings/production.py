@@ -25,6 +25,11 @@ STATICFILES_STORAGE = "whitenoise.storage.CompressedManifestStaticFilesStorage"
 # Middleware: Add WhiteNoise for static files
 MIDDLEWARE.insert(1, "whitenoise.middleware.WhiteNoiseMiddleware")
 
+# Add frontend build to static files
+STATICFILES_DIRS = [
+    BASE_DIR / "../frontend/dist",
+]
+
 # Channel Layer for Production (Redis)
 CHANNEL_LAYERS = {
     "default": {
