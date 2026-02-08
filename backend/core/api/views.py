@@ -6,7 +6,7 @@ from django.contrib.auth import authenticate
 from django.shortcuts import get_object_or_404
 from django.contrib.auth import get_user_model
 from django.db import models # Added models import for Q objects
-from backend.core.models import ConnectionRequest, ConnectionRequest, Tenant, Membership
+from core.models import ConnectionRequest, ConnectionRequest, Tenant, Membership
 from .serializers import (
     UserSerializer, LoginSerializer, ConnectionRequestSerializer,
     SendRequestSerializer, RespondRequestSerializer,
