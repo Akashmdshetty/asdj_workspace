@@ -34,7 +34,7 @@ class TenantSerializer(serializers.ModelSerializer):
     is_owner = serializers.SerializerMethodField()
     
     class Meta:
-        from backend.core.models import Tenant
+        from core.models import Tenant
         model = Tenant
         fields = ('id', 'name', 'slug', 'owner', 'created_at', 'is_owner')
         read_only_fields = ('id', 'slug', 'owner', 'created_at', 'is_owner')
