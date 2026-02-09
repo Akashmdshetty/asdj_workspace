@@ -34,6 +34,11 @@ SECRET_KEY = os.environ.get("SECRET_KEY", "django-insecure-change-me-in-producti
 
 ALLOWED_HOSTS = ["*"]
 
+CSRF_TRUSTED_ORIGINS = [
+    "https://*.fly.dev",
+]
+
+
 # Database
 DATABASES = {
     'default': dj_database_url.config(
