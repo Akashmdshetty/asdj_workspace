@@ -579,6 +579,27 @@
         } catch (e) { }
       };
 
+      const goBack = () => {
+        if (selectedDoc) {
+          // If a doc is open, close it (returning to folder view)
+          setSelectedDoc(null);
+          setDocContent('');
+          return;
+        }
+
+        // If in a folder, go up
+        if (content.current_folder) {
+          handleNavigateUp(breadcrumbs.length - 1);
+        }
+      };
+
+      const goHome = () => {
+        setSelectedDoc(null);
+        setDocContent('');
+        setContent(prev => ({ ...prev, current_folder: null }));
+        setBreadcrumbs([]);
+      };
+
       const postComment = async () => {
         if (!newComment.trim() || !selectedDoc) return;
         try {
@@ -605,8 +626,19 @@
               <div className="flex items-center space-x-6">
                 <div className="flex items-center space-x-6">
                   <div className="flex items-center space-x-3">
-                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-xl font-bold">AD</div>
-                    <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">ASDJ</span>
+                    <button onClick={goHome} className="flex items-center space-x-3 hover:opacity-80 transition-opacity">
+                      <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-purple-600 rounded-lg flex items-center justify-center text-xl font-bold">AD</div>
+                      <span className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-400 bg-clip-text text-transparent">ASDJ</span>
+                    </button>
+                    {(selectedDoc || content.current_folder) && (
+                      <button
+                        onClick={goBack}
+                        className="ml-2 p-2 bg-slate-700/50 hover:bg-slate-700 rounded-lg transition-all text-xl"
+                        title="Go Back"
+                      >
+                        ↩️
+                      </button>
+                    )}
                   </div>
 
                   {/* WORKSPACE SELECTOR */}
