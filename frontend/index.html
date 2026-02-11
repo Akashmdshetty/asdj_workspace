@@ -15,7 +15,7 @@
     }
 
     .custom-scrollbar::-webkit-scrollbar-track {
-      bg-slate-800;
+      background: #1e293b;
     }
 
     .custom-scrollbar::-webkit-scrollbar-thumb {
@@ -30,7 +30,7 @@
 
   <script type="text/babel">
     const { useState, useEffect, useRef } = React;
-    const API_BASE_URL = 'http://127.0.0.1:8000';
+    const API_BASE_URL = window.location.origin;
     const API_URL = `${API_BASE_URL}/api`;
 
     // --- AUTH COMPONENT ---
@@ -479,7 +479,7 @@
         if (!selectedDoc) return;
 
         const wsScheme = window.location.protocol === "https:" ? "wss" : "ws";
-        const ws = new WebSocket(`${wsScheme}://127.0.0.1:8000/ws/doc/${selectedDoc.id}/`);
+        const ws = new WebSocket(`${wsScheme}://${window.location.host}/ws/doc/${selectedDoc.id}/`);
 
         ws.onopen = () => {
           setWsStatus('connected');
