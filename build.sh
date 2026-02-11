@@ -23,8 +23,4 @@ pip install -r requirements.txt
 echo "Collecting static files..."
 python backend/manage.py collectstatic --noinput
 
-# Run migrations
-echo "Running migrations..."
-python backend/manage.py migrate
-
-echo "Build script finished"
+# Build script finished
